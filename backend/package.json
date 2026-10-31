@@ -1,0 +1,15 @@
+{
+  "name": "katuq-pay-validador",
+  "version": "0.1.0",
+  "description": "Prototipo del validador de pagos de Katuq Pay: recibe avisos bancarios, los interpreta y los cruza con pedidos.",
+  "main": "src/server.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
