@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laboratorio · Validador Katuq Pay</title>
+<style>
+  :root { --bg:#f6f5fb; --card:#fff; --ink:#1b1530; --muted:#6b6485; --line:#e4e0f0; --violet:#A31AFF; --cyan:#00b8a5; --warn:#d98a00; --bad:#d6304a; --ok:#14935f; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:#1b1530; color:#fff; padding:14px 20px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header b { font-size:17px; } header span { color:#c9c1e6; }
+  .live { width:9px; height:9px; border-radius:50%; background:#666; display:inline-block; }
+  .live.on { background:#00F2D8; box-shadow:0 0 8px #00F2D8; }
+  main { max-width:1180px; margin:0 auto; padding:16px; display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); }
+  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; min-width:0; }
+  section.wide { grid-column:1/-1; }
+  h2 { font-size:15px; margin:0 0 10px; } h2 small { color:var(--muted); font-weight:400; }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; }
+  input, select, textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff; color:var(--ink); }
+  textarea { min-height:64px; font-family:ui-monospace,Menlo,monospace; font-size:12.5px; }
+  .row { display:flex; gap:8px; } .row > * { flex:1; min-width:0; }
+  button { padding:8px 14px; border:0; border-radius:8px; background:var(--violet); color:#fff; font-weight:600; cursor:pointer; margin-top:10px; }
+  button.ghost { background:#efeaff; color:var(--violet); }
+  button:disabled { opacity:.5; cursor:default; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:500; font-size:12px; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:99px; font-size:11.5px; font-weight:600; white-space:nowrap; }
+  .t-ok { background:#e2f6ee; color:var(--ok); } .t-warn { background:#fff3dc; color:var(--warn); } .t-bad { background:#fde7ea; color:var(--bad); } .t-mut { background:#efedf5; color:var(--muted); }
+  pre { background:#f3f1fa; border-radius:8px; padding:10px; overflow:auto; font-size:12px; margin:8px 0 0; white-space:pre-wrap; word-break:break-word; }
+  .muted { color:var(--muted); } .mono { font-family:ui-monospace,Menlo,monospace; font-size:12px; word-break:break-all; }
+  .scroll { max-height:340px; overflow:auto; }
+  .note { font-size:12px; color:var(--muted); margin-top:8px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="live" id="live"></span><b>Laboratorio del validador</b><span id="merchantName">sin comercio</span>
+</header>
+<main>
+
+<section>
+  <h2>1. Comercio de prueba</h2>
+  <button id="btnNew">Crear comercio de prueba</button>
+  <label>…o pega una llave existente (mk_…)</label>
+  <div class="row"><input id="key" class="mono"><button class="ghost" id="btnUse" style="flex:0 0 auto">Usar</button></div>
+  <button class="ghost" id="btnCode">Generar código para vincular un celular</button>
+  <pre id="codeOut" hidden></pre>
+  <p class="note">La llave queda solo en esta pestaña. Ábrela también en <a href="caja.html" target="_blank">modo caja</a> para oír los pagos.</p>
+</section>
+
+<section>
+  <h2>2. Pedidos pendientes <small>(en Katuq vienen del OMS)</small></h2>
+  <div class="row">
+    <div><label>Monto (COP)</label><input id="ordAmount" type="number" value="50000" min="1"></div>
+    <div><label>Referencia (opcional)</label><input id="ordRef" placeholder="KP-…"></div>
+  </div>
+  <button id="btnOrder">Crear pedido</button>
+  <div class="scroll"><table id="tblOrders"><thead><tr><th>Pedido</th><th>Monto</th><th>Ref</th><th>Estado</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section>
+  <h2>3. Simular aviso del banco</h2>
+  <div class="row">
+    <div><label>Banco (paquete Android)</label>
+      <select id="sigPkg">
+        <option value="com.nequi.MobileApp">Nequi</option>
+        <option value="com.davivienda.daviplataapp">Daviplata</option>
+        <option value="com.whatsapp">Otra app (debe ignorarse)</option>
+      </select></div>
+    <div><label>Hace (minutos)</label><input id="sigAgo" type="number" value="0" min="0"></div>
+  </div>
+  <label>Título</label><input id="sigTitle" value="Nequi">
+  <label>Texto de la notificación</label><textarea id="sigText">Recibiste $50.000 de Ana Pérez</textarea>
+  <button id="btnSig">Enviar aviso</button>
+  <pre id="sigOut" hidden></pre>
+</section>
+
+<section>
+  <h2>4. Subir comprobante <small>(pantallazo del cliente)</small></h2>
+  <label>Pedido</label><select id="rcOrder"></select>
+  <div class="row">
+    <div><label>Monto del comprobante</label><input id="rcAmount" type="number" value="80000"></div>
+    <div><label>Hace (minutos)</label><input id="rcAgo" type="number" value="0" min="0"></div>
+  </div>
+  <button id="btnRc">Subir comprobante</button>
+  <pre id="rcOut" hidden></pre>
+</section>
+
+<section class="wide">
+  <h2>5. Pagos verificados</h2>
+  <div class="scroll"><table id="tblPays"><thead><tr><th>Hora</th><th>Banco</th><th>Monto</th><th>Pagador</th><th>Estado</th><th>Pedido / motivo</th><th></th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section class="wide">
+  <h2>6. Escenarios automáticos <small>— prueban las reglas de cruce y antifraude en un comercio nuevo</small></h2>
+  <button id="btnScen">Correr los 8 escenarios</button>
+  <table id="tblScen" style="margin-top:10px"><thead><tr><th>#</th><th>Escenario</th><th>Esperado</th><th>Obtenido</th><th>Resultado</th></tr></thead><tbody></tbody></table>
+</section>
+
+<section class="wide">
+  <h2>7. Avisos crudos y calibración de plantillas</h2>
+  <p class="note" style="margin-top:0">Pega aquí el texto EXACTO de notificaciones reales de Nequi o Daviplata. Si sale "no interpretado", ajusta la plantilla, pruébala y guárdala con la llave de administrador (variable ADMIN_KEY del servidor). Al guardar se reprocesan los avisos pendientes.</p>
+  <div class="row">
+    <div>
+      <label>Plantilla</label><select id="tplSel"></select>
+      <label>Abono (credit)</label><input id="tpl_credit" class="mono">
+      <label>Ignorar (ignore)</label><input id="tpl_ignore" class="mono">
+      <label>Monto (amount)</label><input id="tpl_amount" class="mono">
+      <label>Pagador (payer)</label><input id="tpl_payer" class="mono">
+      <label>Referencia (reference)</label><input id="tpl_reference" class="mono">
+    </div>
+    <div>
+      <label>Texto de prueba</label><textarea id="tplText" style="min-height:120px">Recibiste $50.000 de Ana Pérez</textarea>
+      <button class="ghost" id="btnTry">Probar plantilla editada</button>
+      <pre id="tplOut" hidden></pre>
+      <label>Llave de administrador</label><input id="adminKey" type="password">
+      <button id="btnSave">Guardar plantillas</button>
+    </div>
+  </div>
+  <h2 style="margin-top:16px">Últimos avisos recibidos</h2>
+  <div class="scroll"><table id="tblRaw"><thead><tr><th>Hora</th><th>Origen</th><th>Texto</th><th>Interpretación</th><th></th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<section class="wide">
+  <h2>8. Cajas vinculadas</h2>
+  <table id="tblDev"><thead><tr><th>Caja</th><th>Último latido</th><th>Notificaciones</th><th>Estado</th></tr></thead><tbody></tbody></table>
+</section>
+
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => '$ ' + Number(n || 0).toLocaleString('es-CO');
+const hhmm = (d) => d ? new Date(d).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '';
+const ago = (min) => new Date(Date.now() - (Number(min) || 0) * 60000).toISOString();
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let KEY = sessionStorageGet('mk') || '', es = null, TEMPLATES = [];
+
+function sessionStorageGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+function sessionStorageSet(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
+
+async function api(method, path, body, key = KEY) {
+  const r = await fetch(path, { method, headers: { 'content-type': 'application/json', ...(key ? { authorization: 'Bearer ' + key } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const t = await r.text();
+  let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) { j = { raw: t }; }
+  if (!r.ok) throw Object.assign(new Error((j && j.error) || ('HTTP ' + r.status)), { status: r.status, body: j });
+  return j;
+}
+const show = (id, obj) => { const el = $(id); el.hidden = false; el.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2); };
+
+const STATUS = {
+  pendiente: ['Pendiente', 't-mut'], pagado: ['Pagado', 't-ok'], pago_en_revision: ['Pago en revisión', 't-warn'],
+  verificado: ['Verificado', 't-ok'], asignado: ['Asignado', 't-ok'], en_revision: ['En revisión', 't-warn'],
+  parsed: ['Interpretado', 't-ok'], unparsed: ['No interpretado', 't-bad'], ignored: ['Ignorado', 't-mut'],
+  confirmed: ['Confirmado', 't-ok'], no_signal: ['Sin aviso del banco', 't-warn'], ambiguous: ['Ambiguo', 't-warn'],
+};
+const tag = (s) => { const [t, c] = STATUS[s] || [s, 't-mut']; return `<span class="tag ${c}">${esc(t)}</span>`; };
+
+async function useKey(k) {
+  KEY = k.trim(); sessionStorageSet('mk', KEY); $('key').value = KEY;
+  if (es) es.close();
+  es = new EventSource('/v1/stream?key=' + encodeURIComponent(KEY));
+  es.addEventListener('hello', (e) => { $('live').classList.add('on'); $('merchantName').textContent = JSON.parse(e.data).merchant; });
+  ['payment.verified', 'order.paid', 'receipt.unverified'].forEach((ev) => es.addEventListener(ev, () => refresh()));
+  es.onerror = () => $('live').classList.remove('on');
+  await refresh();
+}
+
+async function refresh() {
+  if (!KEY) return;
+  try {
+    const [orders, pays, raws, devs] = await Promise.all([api('GET', '/v1/orders'), api('GET', '/v1/payments'), api('GET', '/v1/signals'), api('GET', '/v1/devices')]);
+    $('tblOrders').tBodies[0].innerHTML = orders.slice().reverse().map((o) => `<tr><td class="mono">${esc(o.id)}</td><td>${fmt(o.amount)}</td><td class="mono">${esc(o.reference)}</td><td>${tag(o.status)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Sin pedidos</td></tr>';
+    const open = orders.filter((o) => o.status !== 'pagado');
+    $('rcOrder').innerHTML = orders.map((o) => `<option value="${esc(o.id)}">${esc(o.reference)} · ${fmt(o.amount)} · ${esc((STATUS[o.status] || [o.status])[0])}</option>`).join('');
+    $('tblPays').tBodies[0].innerHTML = pays.slice().reverse().map((p) => {
+      const assign = p.status === 'en_revision' && open.length
+        ? `<select data-pay="${esc(p.id)}">${open.map((o) => `<option value="${esc(o.id)}">${esc(o.reference)} · ${fmt(o.amount)}</option>`).join('')}</select><button class="ghost" data-assign="${esc(p.id)}" style="margin-top:4px">Asignar</button>` : '';
+      return `<tr><td>${hhmm(p.occurredAt)}</td><td>${esc(p.bank)}</td><td><b>${fmt(p.amount)}</b></td><td>${esc(p.payer || '—')}</td><td>${tag(p.status)}</td><td class="mono">${esc(p.orderId ? p.orderId + ' (' + p.rule + ')' : p.reviewReason || '')}</td><td>${assign}</td></tr>`;
+    }).join('') || '<tr><td colspan="7" class="muted">Sin pagos</td></tr>';
+    $('tblRaw').tBodies[0].innerHTML = raws.map((r) => `<tr><td>${hhmm(r.occurredAt)}</td><td class="mono">${esc(r.package || r.from)}${r.simulated ? ' <span class="tag t-mut">simulado</span>' : ''}</td><td>${esc(r.title)} · ${esc(r.text)}</td><td>${tag(r.parse.status)}${r.parse.amount ? ' ' + fmt(r.parse.amount) : ''}${r.parse.reason ? '<div class="muted">' + esc(r.parse.reason) + '</div>' : ''}</td><td><button class="ghost" data-calib="${esc(r.id)}" style="margin:0">Calibrar</button></td></tr>`).join('') || '<tr><td colspan="5" class="muted">Sin avisos</td></tr>';
+    window.__raws = raws;
+    $('tblDev').tBodies[0].innerHTML = devs.map((d) => `<tr><td>${esc(d.name)}</td><td>${hhmm(d.lastHeartbeat)}</td><td>${d.listenerEnabled === false ? tag('unparsed').replace('No interpretado', 'Sin permiso') : d.listenerEnabled ? '<span class="tag t-ok">Con permiso</span>' : '—'}</td><td>${d.listening ? '<span class="tag t-ok">Escuchando</span>' : '<span class="tag t-bad">Sin señal</span>'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Ningún celular vinculado todavía</td></tr>';
+  } catch (e) {
+    if (e.status === 401) { $('merchantName').textContent = 'llave inválida'; KEY = ''; }
+  }
+}
+
+// ---------- acciones ----------
+$('btnNew').onclick = async () => { const m = await api('POST', '/v1/merchants', { name: 'Comercio de prueba ' + new Date().toLocaleTimeString('es-CO') }, null); await useKey(m.apiKey); };
+$('btnUse').onclick = () => useKey($('key').value);
+$('btnCode').onclick = async () => { try { const c = await api('POST', '/v1/devices/link-code'); show('codeOut', `Código: ${c.code}\nVence en 10 minutos. Escríbelo en la app del celular.`); } catch (e) { show('codeOut', e.message); } };
+$('btnOrder').onclick = async () => { try { await api('POST', '/v1/orders', { amount: Number($('ordAmount').value), reference: $('ordRef').value || undefined }); $('ordRef').value = ''; refresh(); } catch (e) { alert(e.message); } };
+$('sigPkg').onchange = () => { $('sigTitle').value = { 'com.nequi.MobileApp': 'Nequi', 'com.davivienda.daviplataapp': 'DaviPlata' }[$('sigPkg').value] || 'WhatsApp'; };
+$('btnSig').onclick = async () => {
+  try { show('sigOut', await api('POST', '/v1/lab/notification', { package: $('sigPkg').value, title: $('sigTitle').value, text: $('sigText').value, postedAt: ago($('sigAgo').value) })); refresh(); }
+  catch (e) { show('sigOut', e.message); }
+};
+$('btnRc').onclick = async () => {
+  try { show('rcOut', await api('POST', '/v1/receipts', { orderId: $('rcOrder').value, amount: Number($('rcAmount').value), occurredAt: ago($('rcAgo').value) })); refresh(); }
+  catch (e) { show('rcOut', e.message); }
+};
+document.addEventListener('click', async (ev) => {
+  const a = ev.target.closest('[data-assign]');
+  if (a) {
+    const id = a.dataset.assign, orderId = document.querySelector(`select[data-pay="${id}"]`).value;
+    const user = prompt('¿Quién asigna? (queda en la auditoría)'); if (!user) return;
+    const reason = prompt('Motivo de la asignación manual'); if (!reason) return;
+    try { await api('POST', `/v1/payments/${id}/assign`, { orderId, user, reason }); refresh(); } catch (e) { alert(e.message); }
+  }
+  const c = ev.target.closest('[data-calib]');
+  if (c) {
+    const r = (window.__raws || []).find((x) => x.id === c.dataset.calib);
+    if (!r) return;
+    $('tplText').value = [r.title, r.text].filter(Boolean).join(' · ');
+    const i = TEMPLATES.findIndex((t) => t.source === r.source && (t.match.packages || []).includes(r.package));
+    if (i >= 0) { $('tplSel').value = i; loadTpl(); }
+    $('tplText').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+});
+
+// ---------- plantillas ----------
+const FIELDS = ['credit', 'ignore', 'amount', 'payer', 'reference'];
+async function loadTemplatesUI() {
+  TEMPLATES = await api('GET', '/v1/templates', null, null);
+  $('tplSel').innerHTML = TEMPLATES.map((t, i) => `<option value="${i}">${esc(t.bank)} · ${esc(t.source)} · v${t.version}</option>`).join('');
+  loadTpl();
+}
+function loadTpl() { const t = TEMPLATES[$('tplSel').value]; FIELDS.forEach((f) => ($('tpl_' + f).value = t[f] || '')); }
+function editedTpl() { const t = { ...TEMPLATES[$('tplSel').value] }; FIELDS.forEach((f) => (t[f] = $('tpl_' + f).value)); return t; }
+$('tplSel').onchange = loadTpl;
+$('btnTry').onclick = async () => {
+  const t = editedTpl();
+  const signal = t.source === 'email' ? { source: 'email', from: 'x' + (t.match.senders || [''])[0], text: $('tplText').value } : { source: 'notification', package: (t.match.packages || [''])[0], text: $('tplText').value };
+  try { show('tplOut', await api('POST', '/v1/templates/try', { signal, template: t }, null)); } catch (e) { show('tplOut', e.message); }
+};
+$('btnSave').onclick = async () => {
+  const list = TEMPLATES.slice(); list[$('tplSel').value] = editedTpl();
+  try { const r = await api('PUT', '/v1/templates', { templates: list }, $('adminKey').value); show('tplOut', `Guardado. Avisos recuperados: ${r.recovered}`); await loadTemplatesUI(); refresh(); }
+  catch (e) { show('tplOut', e.message); }
+};
+
+// ---------- escenarios ----------
+const SCEN = [
+  { name: 'Monto único: el aviso marca el pedido como pagado', expect: 'Pagado', run: async (k) => {
+      const o = await api('POST', '/v1/orders', { amount: 41000 }, k);
+      await api('POST', '/v1/lab/notification', { package: 'com.nequi.MobileApp', title: 'Nequi', text: 'Recibiste $41.000 de Ana Pérez' }, k);
+      return statusOf(k, o.id); } },
+  { name: 'Referencia KP en el mensaje gana aunque haya montos repetidos', expect: 'Pagado', run: async (k) => {
+      await api('POST', '/v1/orders', { amount: 42000 }, k);
+      const o = await api('POST', '/v1/orders', { amount: 42000, reference: 'KP-REF042' }, k);
+      await api('POST', '/v1/lab/notification', { package: 'com.davivienda.daviplataapp', title: 'DaviPlata', text: 'Recibiste $42.000 de Luis. Mensaje: KP-REF042' }, k);
+      return statusOf(k, o.id); } },
+  { name: 'Dos pedidos con el mismo monto: va a revisión', expect: 'Pago en revisión', run: async (k) => {
+      const o = await api('POST', '/v1/orders', { amount: 43000 }, k);
+      await api('POST', '/v1/orders', { amount: 43000 }, k);
+      await api('POST', '/v1/lab/notification', { package: 'com.nequi.MobileApp', title: 'Nequi', text: 'Recibiste $43.000 de Marta' }, k);
+      return statusOf(k, o.id); } },
+  { name: 'Comprobante sin aviso del banco: NO se marca pagado', expect: 'Pago en revisión', run: async (k) => {
+      const o = await api('POST', '/v1/orders', { amount: 44000 }, k);
+      await api('POST', '/v1/receipts', { orderId: o.id, amount: 44000 }, k);
+      return statusOf(k, o.id); } },
+  { name: 'Comprobante y luego llega el aviso real: se confirma', expect: 'Pagado', run: async (k) => {
+      const o = await api('POST', '/v1/orders', { amount: 45000 }, k);
+      await api('POST', '/v1/receipts', { orderId: o.id, amount: 45000 }, k);
+      await api('POST', '/v1/lab/notification', { package: 'com.davivienda.daviplataapp', title: 'DaviPlata', text: 'Recibiste $45.000 de Juan' }, k);
+      return statusOf(k, o.id); } },
+  { name: 'Egreso ("Enviaste") no cuenta como pago', expect: 'Pendiente', run: async (k) => {
+      const o = await api('POST', '/v1/orders', { amount: 46000 }, k);
+      await api('POST', '/v1/lab/notification', { package: 'com.nequi.MobileApp', title: 'Nequi', text: 'Enviaste $46.000 a Pedro' }, k);
+      return statusOf(k, o.id); } },
+  { name: 'Notificación de otra app se ignora', expect: 'Pendiente', run: async (k) => {
+      const o = await api('POST', '/v1/orders', { amount: 47000 }, k);
+      await api('POST', '/v1/lab/notification', { package: 'com.whatsapp', title: 'Cliente', text: 'Recibiste $47.000 te mando el pantallazo' }, k);
+      return statusOf(k, o.id); } },
+  { name: 'Aviso duplicado no se cuenta dos veces', expect: '1 pago', run: async (k) => {
+      for (let i = 0; i < 2; i++) await api('POST', '/v1/lab/notification', { package: 'com.nequi.MobileApp', title: 'Nequi', text: 'Recibiste $48.000 de Sara' }, k);
+      const pays = await api('GET', '/v1/payments', null, k);
+      return pays.filter((p) => p.amount === 48000).length + ' pago' + (pays.filter((p) => p.amount === 48000).length === 1 ? '' : 's'); } },
+];
+async function statusOf(k, id) { const o = (await api('GET', '/v1/orders', null, k)).find((x) => x.id === id); return (STATUS[o.status] || [o.status])[0]; }
+$('btnScen').onclick = async () => {
+  $('btnScen').disabled = true;
+  const body = $('tblScen').tBodies[0]; body.innerHTML = '';
+  const m = await api('POST', '/v1/merchants', { name: 'Escenarios automáticos' }, null);
+  let ok = 0;
+  for (const [i, s] of SCEN.entries()) {
+    let got; try { got = await s.run(m.apiKey); } catch (e) { got = 'error: ' + e.message; }
+    const pass = got === s.expect; ok += pass;
+    body.insertAdjacentHTML('beforeend', `<tr><td>${i + 1}</td><td>${esc(s.name)}</td><td>${esc(s.expect)}</td><td>${esc(got)}</td><td>${pass ? '<span class="tag t-ok">Pasa</span>' : '<span class="tag t-bad">Falla</span>'}</td></tr>`);
+  }
+  body.insertAdjacentHTML('beforeend', `<tr><td></td><td colspan="4"><b>${ok} de ${SCEN.length} escenarios pasan.</b> Comercio usado: <span class="mono">${esc(m.apiKey)}</span> <button class="ghost" style="margin:0 0 0 8px" onclick="useKey('${m.apiKey}')">Verlo arriba</button></td></tr>`);
+  $('btnScen').disabled = false;
+};
+
+loadTemplatesUI();
+if (KEY) useKey(KEY);
+</script>
+</body>
+</html>
