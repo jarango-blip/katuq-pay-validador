@@ -1,0 +1,66 @@
+{
+  "_nota": "PLANTILLAS PROVISIONALES. Los textos exactos de Nequi y Daviplata se calibran con avisos reales guardados en raw_signals antes de producción. Los nombres de paquete también se confirman en un celular real.",
+  "templates": [
+    {
+      "bank": "nequi",
+      "source": "notification",
+      "match": {
+        "packages": [
+          "com.nequi.MobileApp"
+        ]
+      },
+      "credit": "(recib(iste|i[oó])|te (envi[oó]|lleg[oó]|transfiri[oó])|abono)",
+      "ignore": "(enviaste|pagaste|compraste|retiraste|recargaste|tu saldo es)",
+      "amount": "\\$\\s?([0-9][0-9.,]*)",
+      "payer": "(?:de|desde)\\s+([^,.$\\n]{2,40}?)(?=\\s*(?:[,.$]|$)|\\s+(?:por|el|en|a|con|mensaje)\\b)",
+      "reference": "(KP-[A-Z0-9]{4,10})",
+      "version": 1
+    },
+    {
+      "bank": "daviplata",
+      "source": "notification",
+      "match": {
+        "packages": [
+          "com.davivienda.daviplataapp"
+        ]
+      },
+      "credit": "(recib(iste|i[oó])|te (envi[oó]|lleg[oó]|transfiri[oó])|abono|ingreso)",
+      "ignore": "(enviaste|pagaste|compraste|retiraste|recargaste|tu saldo es)",
+      "amount": "\\$\\s?([0-9][0-9.,]*)",
+      "payer": "(?:de|desde)\\s+([^,.$\\n]{2,40}?)(?=\\s*(?:[,.$]|$)|\\s+(?:por|el|en|a|con|mensaje)\\b)",
+      "reference": "(KP-[A-Z0-9]{4,10})",
+      "version": 1
+    },
+    {
+      "bank": "nequi",
+      "source": "email",
+      "match": {
+        "senders": [
+          "@nequi.com.co"
+        ]
+      },
+      "credit": "(recib(iste|i[oó])|te (envi[oó]|lleg[oó])|abono)",
+      "ignore": "(enviaste|pagaste|compraste|retiraste)",
+      "amount": "\\$\\s?([0-9][0-9.,]*)",
+      "payer": "(?:de|desde)\\s+([^,.$\\n]{2,40}?)(?=\\s*(?:[,.$]|$)|\\s+(?:por|el|en|a|con|mensaje)\\b)",
+      "reference": "(KP-[A-Z0-9]{4,10})",
+      "version": 1
+    },
+    {
+      "bank": "daviplata",
+      "source": "email",
+      "match": {
+        "senders": [
+          "@davivienda.com",
+          "@daviplata.com"
+        ]
+      },
+      "credit": "(recib(iste|i[oó])|te (envi[oó]|lleg[oó])|abono|ingreso)",
+      "ignore": "(enviaste|pagaste|compraste|retiraste)",
+      "amount": "\\$\\s?([0-9][0-9.,]*)",
+      "payer": "(?:de|desde)\\s+([^,.$\\n]{2,40}?)(?=\\s*(?:[,.$]|$)|\\s+(?:por|el|en|a|con|mensaje)\\b)",
+      "reference": "(KP-[A-Z0-9]{4,10})",
+      "version": 1
+    }
+  ]
+}
