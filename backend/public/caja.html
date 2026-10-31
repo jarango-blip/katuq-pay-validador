@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modo caja · Katuq Pay</title>
+<style>
+  :root { --bg:#0f0b1a; --card:#1b1530; --ink:#f4f1ff; --muted:#a79fc2; --violet:#A31AFF; --cyan:#00F2D8; --warn:#ffb020; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid #2a2346; }
+  header b { font-size:18px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#555; }
+  .dot.on { background:var(--cyan); box-shadow:0 0 10px var(--cyan); }
+  main { max-width:720px; margin:0 auto; padding:20px 16px; }
+  .connect { display:flex; gap:8px; flex-wrap:wrap; }
+  input { flex:1; min-width:220px; padding:12px; border-radius:10px; border:1px solid #3a3160; background:var(--card); color:var(--ink); }
+  button { padding:12px 18px; border-radius:10px; border:0; background:var(--violet); color:#fff; font-weight:600; cursor:pointer; }
+  .total { margin:24px 0 8px; color:var(--muted); }
+  .total strong { display:block; font-size:40px; color:var(--ink); }
+  ul { list-style:none; padding:0; margin:0; }
+  li { background:var(--card); border-radius:12px; padding:14px 16px; margin:10px 0; display:flex; justify-content:space-between; gap:12px; border-left:4px solid var(--cyan); }
+  li.rev { border-left-color:var(--warn); }
+  li .amt { font-size:22px; font-weight:700; }
+  li small { color:var(--muted); display:block; margin-top:4px; }
+  .flash { animation:flash 1.2s ease-out; }
+  @keyframes flash { from { background:#2d2160; } to { background:var(--card); } }
+</style>
+</head>
+<body>
+<header><span class="dot" id="dot"></span><b>Modo caja</b><span id="who" style="color:var(--muted)"></span></header>
+<main>
+  <div class="connect">
+    <input id="key" placeholder="Llave del comercio (mk_...)" autocomplete="off">
+    <button id="go">Conectar</button>
+  </div>
+  <p class="total">Verificado hoy<strong id="total">$ 0</strong></p>
+  <ul id="list"></ul>
+</main>
+<script>
+  const fmt = (n) => '$ ' + Number(n).toLocaleString('es-CO');
+  let total = 0, es;
+  function speak(text) {
+    try { const u = new SpeechSynthesisUtterance(text); u.lang = 'es-CO'; speechSynthesis.speak(u); } catch (e) {}
+  }
+  function add(p) {
+    const li = document.createElement('li');
+    li.className = 'flash' + (p.status === 'en_revision' ? ' rev' : '');
+    const hora = new Date(p.occurredAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+    li.innerHTML = '<div><div class="amt"></div><small></small></div><small></small>';
+    li.querySelector('.amt').textContent = fmt(p.amount);
+    li.querySelectorAll('small')[0].textContent = (p.bank || '').toUpperCase() + (p.payer ? ' · ' + p.payer : '');
+    li.querySelectorAll('small')[1].textContent = hora + (p.status === 'en_revision' ? ' · en revisión' : '');
+    document.getElementById('list').prepend(li);
+    total += p.amount;
+    document.getElementById('total').textContent = fmt(total);
+  }
+  document.getElementById('go').onclick = () => {
+    const key = document.getElementById('key').value.trim();
+    if (!key) return;
+    if (es) es.close();
+    speak('Modo caja conectado');
+    es = new EventSource('/v1/stream?key=' + encodeURIComponent(key));
+    es.addEventListener('hello', (e) => { document.getElementById('dot').classList.add('on'); document.getElementById('who').textContent = JSON.parse(e.data).merchant; });
+    es.addEventListener('payment.verified', (e) => { const p = JSON.parse(e.data).data; add(p); speak('Pago recibido por ' + p.amount + ' pesos'); });
+    es.onerror = () => document.getElementById('dot').classList.remove('on');
+  };
+</script>
+</body>
+</html>
